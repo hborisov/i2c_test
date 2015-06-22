@@ -30,11 +30,11 @@ NINE    EQU D'9'
     operation
     ENDC
 
+
+
+
 org 0x0800
 i2c
-    nop
-    nop
-    nop
 
     movlw       b'10000000'
     banksel     SSPSTAT
@@ -151,7 +151,7 @@ i2c
 
     banksel     SSPCON2
     btfsc       SSPCON2, ACKSTAT
-    goto        $
+    goto        $-1
 
 ; check for idle
 
@@ -242,7 +242,6 @@ i2c
     goto       $-1
 
 
-    goto    $
 
     return
 
@@ -288,187 +287,24 @@ Start
     clrf        TMR1H
     clrf        TMR1L
 
-    pagesel i2c
-    call    i2c
+    
 
 
 loop    nop
 
-;open i2c
-    movlw       b'10000000'
-    banksel     SSPSTAT
-    movwf       SSPSTAT
-
-    movlw       b'00101000'
-    banksel     SSPCON
-    movwf       SSPCON
-
-    movlw       0x09
-    banksel     SSPADD
-    movwf       SSPADD
-
-    movlw       b'00011000'   ;usart and i2c set
-    banksel     TRISC
-    movwf       TRISC
-    banksel     PORTC
-    bsf         PORTC,3
-    bsf         PORTC,4
-
-
-    banksel     PIR1                                     ;bank0 (bank0? names) be sure
-    bcf         PIR1,SSPIF
-    banksel     SSPCON2                                    ;bank1
-    bsf         SSPCON2,SEN     ;send i2c START [S] bit
-    banksel     PIR1                                 ;bank0
-r1  btfss       PIR1,SSPIF         ;start bit cycle complete?
-    goto        r1               ; No, loop back to test.
-
-    banksel     SSPBUF
-    movlw       b'10010000'
-    movwf       SSPBUF
-
-    banksel     PIR1                     ;bank0
-    bcf         PIR1,SSPIF
-r2  btfss       PIR1,SSPIF                 ;ACK received?
-    ;pagesel     r2
-    goto        r2
-
-    banksel     SSPBUF
-    movlw       b'00000000'   ; last two bits indicate register to read 0 0 -> t reg 0 1 -> conf reg
-    movwf       SSPBUF
-
-    banksel        PIR1                     ;bank0
-    bcf            PIR1,SSPIF
-r3  btfss          PIR1,SSPIF                 ;ACK received?
-    ;pagesel     r3
-    goto        r3
-
-    banksel    PIR1                                           ;bank0
-    bcf        PIR1,SSPIF
-    banksel    SSPCON2                                     ;bank1
-    bsf        SSPCON2,PEN         ;send i2c STOP [P] bit
-    banksel    PIR1                                           ;bank0
-r4  btfss      PIR1,SSPIF             ;stop bit cycle completed?
-    ;pagesel    r4
-    goto       r4
-
-
-    banksel     PIR1                                     ;bank0 (bank0? names) be sure
-    bcf         PIR1,SSPIF
-    banksel     SSPCON2                                    ;bank1
-    bsf         SSPCON2,SEN     ;send i2c START [S] bit
-    banksel     PIR1                                 ;bank0
-r5  btfss       PIR1,SSPIF         ;start bit cycle complete?
-    ;pagesel     r5
-    goto        r5               ; No, loop back to test.
-
-    banksel     SSPBUF
-    movlw       b'10010001'
-    movwf       SSPBUF
-
-;wait for ack i2c
-    banksel        PIR1                     ;bank0
-    bcf            PIR1,SSPIF
-r6  btfss          PIR1,SSPIF                 ;ACK received?
-    ;pagesel     r6
-    goto           r6
-
-;repeated start - enable receiving
-    banksel        SSPCON2                                   ;bank1
-    bsf            SSPCON2,RCEN     ;enable receiving at master 16f877
-
-;receive
-    banksel     PIR1
-r7  nop
-    pagesel     r7
-    btfss       PIR1,SSPIF
-    ;pagesel     r7
-    goto        r7
-    bcf         PIR1,SSPIF
-    banksel     SSPBUF
-    movfw       SSPBUF
-
-;send ack
-
-    banksel     SSPCON2
-    bcf         SSPCON2,ACKDT
-    bsf         SSPCON2,ACKEN
-r8  btfsc       SSPCON2,ACKEN
-    ;pagesel     r8
-    goto        r8
-    bsf         SSPCON2,RCEN
-
-    banksel     byte1
-    movwf       byte1
-
-    banksel     PIR1
-r9  nop
-    pagesel     r9
-    btfss       PIR1,SSPIF
-    goto        r9
-    bcf         PIR1,SSPIF
-   
-;send ack
-
-    banksel     SSPCON2
-    bcf         SSPCON2,ACKDT
-    bsf         SSPCON2,ACKEN
-r10 btfsc       SSPCON2,ACKEN
-    goto        r10
-    bsf         SSPCON2,RCEN
-
-    banksel     SSPBUF
-    movfw       SSPBUF
-
-    banksel     byte2
-    movwf       byte2
-
-;--------
-    banksel     PIR1
-r19  nop
-    pagesel     r19
-    btfss       PIR1,SSPIF
-    goto        r19
-    bcf         PIR1,SSPIF
-    
-;send ack
-
-    banksel     SSPCON2
-    bsf         SSPCON2,ACKDT
-    bsf         SSPCON2,ACKEN
-r110 btfsc       SSPCON2,ACKEN
-    goto        r110
-
-    banksel     SSPBUF
-    movfw       SSPBUF
-
-    banksel     byte3
-    movwf       byte3
-    ;bsf         SSPCON2,RCEN
-;-----
-    ;banksel     SSPBUF
-   ; movfw       SSPBUF
-
-   ; banksel     byte3
-   ; movwf       byte3
-
-    banksel    PIR1                                           ;bank0
-    bcf        PIR1,SSPIF
-    banksel    SSPCON2                                     ;bank1
-    bsf        SSPCON2,PEN         ;send i2c STOP [P] bit
-    banksel    PIR1                                           ;bank0
-r11 btfss      PIR1,SSPIF             ;stop bit cycle completed?
-    ;pagesel    r11
-    ;goto       r11
+    pagesel i2c
+    call    i2c
 
 
 
+
+    pagesel loop
     banksel PORTA
     movlw   b'00000001'
     movwf   PORTA
 
-    banksel byte2
-    movfw   byte2
+    banksel byte1
+    movfw   byte1
     banksel PORTB
     movwf   PORTB
 
@@ -480,24 +316,22 @@ r11 btfss      PIR1,SSPIF             ;stop bit cycle completed?
 	movlw	0x03
 	movwf	d3
 Delay_0
-	decfsz	d1, f
+	pagesel Delay_0
+    decfsz	d1, f
 	goto	$+2
 	decfsz	d2, f
 	goto	$+2
 	decfsz	d3, f
 	goto	Delay_0
 
-			;3 cycles
-	goto	$+1
-	nop
 
 
     banksel PORTA
     movlw   b'00000010'
     movwf   PORTA
 
-    banksel byte3
-    movfw   byte3
+    banksel byte2
+    movfw   byte2
     banksel PORTB
     movwf   PORTB
 
@@ -510,13 +344,41 @@ Delay_0
 	movlw	0x03
 	movwf	d3
 Delay_1
-	decfsz	d1, f
+    pagesel Delay_1
+    decfsz	d1, f
 	goto	$+2
 	decfsz	d2, f
 	goto	$+2
 	decfsz	d3, f
 	goto	Delay_1
 
+
+    banksel PORTA
+    movlw   b'00000100'
+    movwf   PORTA
+
+    movlw   b'00001111'
+    banksel PORTB
+    movwf   PORTB
+
+
+    banksel d1
+    movlw	0x08
+	movwf	d1
+	movlw	0x2F
+	movwf	d2
+	movlw	0x03
+	movwf	d3
+Delay_2
+    pagesel Delay_2
+	decfsz	d1, f
+	goto	$+2
+	decfsz	d2, f
+	goto	$+2
+	decfsz	d3, f
+	goto	Delay_2
+
+    pagesel loop
     goto loop
 
     END
